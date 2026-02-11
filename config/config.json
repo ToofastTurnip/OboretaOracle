@@ -1,0 +1,11 @@
+{
+    "source_type": "local",
+    "local_folder_path": "",
+    "google_drive_folder_id": "",
+    "chroma_db_path": "chroma_db",
+    "chunk_size": 2000,
+    "chunk_overlap": 300,
+    "ollama_base_url": "http://localhost:11434",
+    "llm_model": "gemma3:12b",
+    "embedding_model": "nomic-embed-text"
+}
