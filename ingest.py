@@ -64,7 +64,7 @@ def _load_drive(folder_id: str) -> list:
     except ImportError:
         raise ImportError(
             "Install langchain-google-community to use Google Drive: "
-            "pip install langchain-google-community[drive]"
+            "pip install 'langchain-google-community[drive]'"
         )
 
     from utils.drive_auth import authenticate
@@ -113,6 +113,19 @@ def build_vector_store(
         return "No documents found. Check the source path and try again."
 
     print(f"  Total raw pages/documents: {len(documents)}")
+
+    # ---- 1b. Inject directory path context into each document ----
+    # This ensures folder names (e.g. "Sunbell/blacksmith.txt") become part
+    # of the searchable text, so the retriever can connect documents to their
+    # parent directories even when the content doesn't mention them.
+    root = Path(source_path).resolve() if source_type == "local" else None
+    for doc in documents:
+        src = doc.metadata.get("source", "")
+        if root and src:
+            rel = Path(src).resolve().relative_to(root)
+            doc.page_content = f"[Source: {rel}]\n\n{doc.page_content}"
+        elif src:
+            doc.page_content = f"[Source: {src}]\n\n{doc.page_content}"
 
     # ---- 2. Split into chunks ----
     print("[2/4] Splitting into chunks…")

@@ -24,7 +24,7 @@ Your Notes (.txt, .md, .pdf)
    └──────────┘                        └──────────┘
 ```
 
-1. **Ingestion** — Documents are loaded, split into 2000-character chunks (with 300-char overlap), embedded with `nomic-embed-text` via Ollama, and stored in a persistent ChromaDB database.
+1. **Ingestion** — Documents are loaded, split into 2000-character chunks (with 300-char overlap), embedded with `nomic-embed-text` via Ollama, and stored in a persistent ChromaDB database. Each chunk is prefixed with its relative file path so that folder structure (e.g. `Sunbell/blacksmith.txt`) is captured in the embedding — even if the file contents don't mention the parent directory by name.
 2. **Retrieval** — When you ask a question, the app embeds your query, finds the 5 most relevant chunks from the database, and passes them as context to the LLM.
 3. **Generation** — `gemma3:12b` reads the retrieved chunks and your question, then generates a grounded answer. Source documents are shown in a collapsible panel beneath each response.
 
@@ -64,31 +64,31 @@ streamlit run app.py
 
 ## Usage
 
+The sidebar (branded **Oboreta Oracle**) contains all settings and controls. The main area is a clean chat interface with a centered welcome prompt when empty.
+
 ### Indexing Local Notes
 
 1. Open the app in your browser (Streamlit will print the URL).
-2. In the sidebar under **Dungeon Archive**, select **Local Folder**.
-3. Paste the absolute path to your notes folder (e.g. `/home/user/dnd-notes`).
+2. In the sidebar, select **Local Folder**.
+3. Click **Browse…** to open a native Finder window and select your notes folder, or type the path directly.
 4. Click **Build / Update Database** and wait for indexing to finish.
 5. Start chatting.
 
 ### Indexing Google Drive Notes
 
-Google Drive requires a one-time OAuth setup:
+Google Drive support requires an optional dependency. Install it first:
 
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a project (or use an existing one).
-3. Enable the **Google Drive API**.
-4. Go to **Credentials** > **Create Credentials** > **OAuth client ID**.
-   - Application type: **Desktop app**.
-   - Download the JSON file.
-5. Rename it to `credentials.json` and place it at `config/credentials.json`.
-6. Install the optional Drive dependency:
-   ```bash
-   pip install langchain-google-community[drive]
-   ```
-7. In the app sidebar, select **Google Drive**, paste your folder ID, and click **Build / Update Database**.
-8. On first run, a browser window will open for you to authorize access. A `token.json` is saved at `config/token.json` so you won't need to authorize again.
+```bash
+pip install 'langchain-google-community[drive]'
+```
+
+Then:
+
+1. In the sidebar, select **Google Drive**.
+2. If no credentials are installed yet, an inline setup guide will appear with step-by-step instructions for creating an OAuth client in the Google Cloud Console.
+3. Upload your downloaded `credentials.json` file using the file uploader in the setup guide. The app will save it and reload automatically.
+4. Once credentials are installed, enter your Google Drive folder ID and click **Build / Update Database**.
+5. On first indexing, a browser window will open for you to authorize read-only access. A token is cached so you won't need to authorize again.
 
 > The folder ID is the last segment of the Google Drive folder URL:
 > `https://drive.google.com/drive/folders/`**`1aBcDeFgHiJkLmNoPqRsTuVwXyZ`**
@@ -96,6 +96,21 @@ Google Drive requires a one-time OAuth setup:
 ### Chatting
 
 Type a question into the chat input at the bottom of the page. The Oracle will retrieve relevant chunks from your notes and generate an answer. Click the **Sources** expander beneath any response to see exactly which documents (and pages) were used.
+
+### Folder Structure Awareness
+
+The ingestion pipeline prepends each document's relative file path to its content before embedding. This means folder names are part of the searchable context. For example, if your notes are organized like:
+
+```
+dnd-notes/
+├── Sunbell/
+│   ├── blacksmith.txt
+│   └── tavern.txt
+└── Ironhold/
+    └── garrison.txt
+```
+
+You can ask "Who lives in Sunbell?" and the retriever will surface documents from the `Sunbell/` directory even if the file contents don't mention the town by name.
 
 ### Re-indexing
 
@@ -154,6 +169,6 @@ All settings live in `config/config.json` and are editable through the UI or by 
 
 **Ingestion is slow** — Embedding thousands of chunks takes time on the first run. Subsequent queries are fast since the vectors are persisted.
 
-**Google Drive "credentials not found"** — Ensure `config/credentials.json` exists and is a valid OAuth Desktop-app JSON from Google Cloud Console.
+**Google Drive "credentials not found"** — Select Google Drive in the sidebar and use the inline setup guide to upload your `credentials.json` file.
 
 **Model not found** — Run `ollama list` to see installed models. If a model is missing, pull it with `ollama pull <model-name>`.

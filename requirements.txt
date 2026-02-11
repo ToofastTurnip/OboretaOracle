@@ -1,11 +1,27 @@
+# Core framework
 streamlit>=1.30.0
+
+# LangChain ecosystem
 langchain>=0.3.0
 langchain-community>=0.3.0
 langchain-ollama>=0.2.0
+langchain-chroma>=0.1.0
+langchain-text-splitters>=0.3.0
+
+# Vector store
 chromadb>=0.5.0
+
+# Document loaders
 pypdf>=4.0.0
+PyPDF2>=3.0.0
 unstructured>=0.15.0
-google-api-python-client>=2.100.0
+
+# Google Drive support
+langchain-google-community[drive]>=0.1.0
+google-auth>=2.20.0
 google-auth-httplib2>=0.2.0
 google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.100.0
+
+# Config
 python-dotenv>=1.0.0
