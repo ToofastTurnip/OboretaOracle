@@ -1,6 +1,8 @@
 """Oboreta Oracle — Streamlit chat interface for D&D notes RAG."""
 
+import platform
 import shutil
+import subprocess
 from pathlib import Path
 
 import streamlit as st
@@ -50,17 +52,37 @@ with st.sidebar:
             st.session_state.local_folder_path = config["local_folder_path"]
 
         if st.button("Browse…", use_container_width=True):
-            import subprocess
+            system = platform.system()
+            folder = ""
 
-            result = subprocess.run(
-                [
-                    "osascript", "-e",
-                    'POSIX path of (choose folder with prompt "Select your notes folder")',
-                ],
-                capture_output=True,
-                text=True,
-            )
-            folder = result.stdout.strip()
+            if system == "Darwin":
+                result = subprocess.run(
+                    [
+                        "osascript", "-e",
+                        'POSIX path of (choose folder with prompt "Select your notes folder")',
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                folder = result.stdout.strip()
+
+            elif system == "Windows":
+                result = subprocess.run(
+                    [
+                        "powershell", "-Command",
+                        "Add-Type -AssemblyName System.Windows.Forms; "
+                        "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
+                        "$d.Description = 'Select your notes folder'; "
+                        "if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }",
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                folder = result.stdout.strip()
+
+            else:
+                st.info("Folder browser not supported on this OS. Paste the path below.")
+
             if folder:
                 st.session_state.local_folder_path = folder
 

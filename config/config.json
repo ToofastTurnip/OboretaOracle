@@ -1,7 +1,7 @@
 {
-    "source_type": "local",
+    "source_type": "drive",
     "local_folder_path": "",
-    "google_drive_folder_id": "",
+    "google_drive_folder_id": "16vCdi2vwOo9Je7JfkXDHW8fVg-sDka2f",
     "chroma_db_path": "chroma_db",
     "chunk_size": 2000,
     "chunk_overlap": 300,

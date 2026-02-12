@@ -136,7 +136,7 @@ def build_vector_store(
     chunks = splitter.split_documents(documents)
     print(f"  Created {len(chunks)} chunks")
 
-    # ---- 3. Create embeddings + persist to ChromaDB ----
+    # ---- 3. Create embeddings + persist to ChromaDB (in batches) ----
     print("[3/4] Embedding chunks (this may take a while on first run)…")
     embeddings = OllamaEmbeddings(
         model=config["embedding_model"],
@@ -144,19 +144,74 @@ def build_vector_store(
     )
 
     db_path = str(Path(config["chroma_db_path"]).resolve())
+    batch_size = 10
+    total = len(chunks)
+
+    # Clear any existing collection so stale data doesn't accumulate.
+    import chromadb
+    import time
+    chroma_client = chromadb.PersistentClient(path=db_path)
+    try:
+        chroma_client.delete_collection("dnd_notes")
+        print("  Cleared old collection")
+    except ValueError:
+        pass
+
+    # First batch creates the collection.
     vectorstore = Chroma.from_documents(
-        documents=chunks,
+        documents=chunks[:batch_size],
         embedding=embeddings,
         persist_directory=db_path,
         collection_name="dnd_notes",
     )
+    num_batches = -(-total // batch_size)
+    print(f"  Batch 1/{num_batches} — {min(batch_size, total)}/{total} chunks")
+
+    # Remaining batches add to the existing collection.
+    skipped = 0
+    skipped_by_source = {}
+    indexed_by_source = {}
+    for i in range(batch_size, total, batch_size):
+        batch = chunks[i : i + batch_size]
+        batch_num = i // batch_size + 1
+        try:
+            vectorstore.add_documents(batch)
+            for chunk in batch:
+                src = chunk.metadata.get("source", "unknown")
+                indexed_by_source[src] = indexed_by_source.get(src, 0) + 1
+        except Exception as batch_err:
+            print(f"  Batch {batch_num} failed: {batch_err}")
+            print(f"  Retrying batch {batch_num} one chunk at a time…")
+            time.sleep(2)
+            for j, chunk in enumerate(batch):
+                src = chunk.metadata.get("source", "unknown")
+                try:
+                    vectorstore.add_documents([chunk])
+                    indexed_by_source[src] = indexed_by_source.get(src, 0) + 1
+                except Exception as chunk_err:
+                    preview = chunk.page_content[:80].replace("\n", " ")
+                    print(f"    SKIPPED chunk {i + j} from {src}: {chunk_err}")
+                    print(f"      Preview: {preview}…")
+                    skipped += 1
+                    skipped_by_source[src] = skipped_by_source.get(src, 0) + 1
+                    time.sleep(1)
+        done = min(i + batch_size, total)
+        print(f"  Batch {batch_num}/{num_batches} — {done}/{total} chunks ({skipped} skipped)")
+
+    # Per-source summary for any files that had skipped chunks.
+    if skipped_by_source:
+        print("\n  Skipped chunks by source:")
+        for src, skip_count in sorted(skipped_by_source.items()):
+            idx_count = indexed_by_source.get(src, 0)
+            print(f"    {src}: {skip_count} skipped, {idx_count} indexed")
 
     # ---- 4. Done ----
     count = vectorstore._collection.count()
+    skipped_note = f" ({skipped} chunks skipped due to errors)" if skipped else ""
     msg = (
-        f"[4/4] Done! Indexed {len(chunks)} chunks "
-        f"({len(documents)} source pages) into ChromaDB "
-        f"({count} vectors stored at {db_path})."
+        f"[4/4] Done! Indexed {count} vectors "
+        f"from {len(documents)} source pages into ChromaDB "
+        f"(stored at {db_path}){skipped_note}."
     )
     print(msg)
     return msg
